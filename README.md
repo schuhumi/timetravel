@@ -6,20 +6,32 @@ Linux utility to simplify btrfs snapshots and make jumping in time a breeze
 
 #### Usage:
 
-timetravel.py:
+Usage:
     
-      list
-      
-      snapshot:
-              snapshot create <name>
-              
-              snapshot delete <name>
-              
-              snapshot rename <name> <newname>
-              
-              snapshot copy <name> <name of copy>
-              
-      rollback <new name for current> <snapshot to roll back to>
+    listing volumes and their snapshots:
+    
+            list [<volume>]
+    
+    volume handling:
+    
+            volume create <name> <path>
+            
+            volume delete <name>
+    
+    snapshot handling inside volumes:
+    
+            snapshot create <volume> <name>
+            
+            snapshot delete <volume> <name>
+            
+            snapshot rename <volume> <name> <newname>
+            
+            snapshot copy   <volume> <name> <name of copy>
+    
+    rolling back volumes to a certain snapshot:
+    
+            rollback <volume>  <new name for current> <snapshot to roll back to>
+            
 
 timetravel-gui.py is useless right now.
 
