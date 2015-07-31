@@ -19,69 +19,113 @@
 
 import timetravel_backend as tt
 import sys
+import os
 
 def printUsage ():
     print("""Usage:
     
-    list
+    listing volumes and their snapshots:
     
-    snapshot:
-            snapshot create <name>
+            list [<volume>]
+    
+    volume handling:
+    
+            volume create <name> <path>
             
-            snapshot delete <name>
+            volume delete <name>
+    
+    snapshot handling inside volumes:
+    
+            snapshot create <volume> <name>
             
-            snapshot rename <name> <newname>
+            snapshot delete <volume> <name>
             
-            snapshot copy <name> <name of copy>
+            snapshot rename <volume> <name> <newname>
             
-    rollback <new name for current> <snapshot to roll back to>""")
+            snapshot copy   <volume> <name> <name of copy>
+    
+    rolling back volumes to a certain snapshot:
+    
+            rollback <volume>  <new name for current> <snapshot to roll back to>
+            """)
     quit()
 
 if len(sys.argv)<=1:
     printUsage()
 
+euid = os.geteuid()
+if euid != 0:
+    args = ['sudo', sys.executable] + sys.argv + [os.environ]
+    os.execlpe('sudo', *args)
+
 if sys.argv[1] == "list":
     snaplist = tt.listSnaps()
-    for snap in snaplist:
-        print("ID: "+snap["ID"]+" \ttop level: "+snap["top level"]+"\tgen: "+snap["gen"]+"\tpath: "+snap["path"])
+    if len(sys.argv) > 2:
+        if sys.argv[2] in snaplist:
+            for snap in snaplist[sys.argv[2]]:
+                print("ID: "+snap["ID"]+" \ttop level: "+snap["top level"]+"\tgen: "+snap["gen"]+"\tpath: "+snap["path"])
+        else:
+            print("volume "+sys.argv[2]+" not found")
+    else:
+        for volume in snaplist:
+            print(volume+":")
+            for snap in snaplist[volume]:
+                print("\tID: "+snap["ID"]+" \ttop level: "+snap["top level"]+"\tgen: "+snap["gen"]+"\tpath: "+snap["path"])
     tt.cleanup()
     quit()
-elif sys.argv[1] == "snapshot":
+elif sys.argv[1] == "volume":
     if len(sys.argv)<=2:
         printUsage()
     elif sys.argv[2] == "create":
-        if len(sys.argv)!=4:
+        if len(sys.argv)!=5:
             printUsage()
         else:
-            tt.createSnapshot(sys.argv[3])
+            tt.createVolume(sys.argv[3], sys.argv[4])
             tt.cleanup()
             quit()
     elif sys.argv[2] == "delete":
         if len(sys.argv)!=4:
             printUsage()
         else:
-            tt.deleteSnapshot(sys.argv[3])
+            tt.deleteVolume(sys.argv[3])
+            tt.cleanup()
+            quit()
+elif sys.argv[1] == "snapshot":
+    if len(sys.argv)<=2:
+        printUsage()
+    elif sys.argv[2] == "create":
+        if len(sys.argv)!=5:
+            printUsage()
+        else:
+            tt.createSnapshot(sys.argv[3], sys.argv[4])
+            tt.cleanup()
+            quit()
+    elif sys.argv[2] == "delete":
+        if len(sys.argv)!=5:
+            printUsage()
+        else:
+            tt.deleteSnapshot(sys.argv[3], sys.argv[4])
             tt.cleanup()
             quit()
     elif sys.argv[2] == "rename":
-        if len(sys.argv)!=5:
+        if len(sys.argv)!=6:
             printUsage()
         else:
-            tt.renameSnapshot(sys.argv[3], sys.argv[4])
+            tt.renameSnapshot(sys.argv[3], sys.argv[4], sys.argv[5])
             tt.cleanup()
             quit()
     elif sys.argv[2] == "copy":
-        if len(sys.argv)!=5:
+        if len(sys.argv)!=6:
             printUsage()
         else:
-            tt.copySnapshot(sys.argv[3], sys.argv[4])
+            tt.copySnapshot(sys.argv[3], sys.argv[4], sys.argv[5])
             tt.cleanup()
             quit()
 elif sys.argv[1] == "rollback":
-    if len(sys.argv) != 4:
+    if len(sys.argv) != 5:
         printUsage()
     else:
-        tt.rollback(sys.argv[2], sys.argv[3])
+        tt.rollback(sys.argv[2], sys.argv[3], sys.argv[4])
         tt.cleanup()
         quit()
 else:
