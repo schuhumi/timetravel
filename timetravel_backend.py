@@ -17,6 +17,7 @@
 
 import subprocess
 import os
+import shutil
 
 version = "0.01"
 
@@ -143,7 +144,7 @@ def volumeGetMountSetting(volume=""):
         mount = f.read()
     return mount
     
-def createVolume(volume="", mount="", backupappend=".backup"):
+def createVolume(volume="", mount="", backupappend=".temporary_timetravel_backup"):
     global snapPath
     
     if len(volume)<1:
@@ -151,9 +152,6 @@ def createVolume(volume="", mount="", backupappend=".backup"):
         return
     if len(mount)<1:
         errr("No path to mount volume at given, therefore can't create volume")
-        return
-    if os.path.isdir(mount) or os.path.isfile(mount):
-        errr("Path to mount volume already exist, therefore can't create volume")
         return
     if volumeExists(volume):
         errr("Volume already exists, therefore can't create it!")
@@ -169,15 +167,70 @@ def createVolume(volume="", mount="", backupappend=".backup"):
     
     os.makedirs(snapPath+"/"+volume)
     volumeSetMountSetting(volume, mount)
-    createSubvolume(snapPath+"/"+volume+"/current")
-    setDefault(volume, "current")
-    #createSnapshot(volume, "current")
+    if os.path.isfile(mount):
+        errr("Mount is a file, not folder. Therefore can't create volume of mount!")
+        return
+    elif os.path.isdir(mount):
+        st = os.stat(mount)
+        os.rename(mount, mount+backupappend)
+        createSubvolume(snapPath+"/"+volume+"/current")
+        os.chown(snapPath+"/"+volume+"/current", st.st_uid, st.st_gid)
+        setDefault(volume, "current")
+        os.makedirs(mount)
+        os.chown(snapPath+"/"+volume+"/current", st.st_uid, st.st_gid)
+        mountVolume(volume)
+        listOfFiles = os.listdir(mount+backupappend)
+        for File in listOfFiles:
+            #os.rename(mount+backupappend+"/"+File, mount+"/"+File)
+            #shutil.move(mount+backupappend+"/"+File, mount+"/"+File)
+            subprocess.check_call(["mv", mount+backupappend+"/"+File, mount+"/"+File])
+        
+        listOfFiles = os.listdir(mount+backupappend)
+        if len(listOfFiles) == 0:
+            os.rmdir(mount+backupappend)
+            return
+        else:
+            errr("createVolume: Couldn't copy all files from '"+mount+backupappend+"' to '"+mount+"'! Please use a file manager to fix it")
+            return
+    else:
+        createSubvolume(snapPath+"/"+volume+"/current")
+        setDefault(volume, "current")
+        os.makedirs(mount)
+        mountVolume(volume)
+        return
+    
+def importVolume(volume="", mount="", backupappend=".backup"):
+    global snapPath
+    
+    if len(volume)<1:
+        errr("No volume name given, therefore can't import volume")
+        return
+    if len(mount)<1:
+        errr("No path to mount volume at given, therefore can't import volume")
+        return
+    if not os.path.isdir(mount):
+        errr("Path to volume does not exist, therefore can't import volume")
+        return
+    if volumeExists(volume):
+        errr("Volume with this name already exists, therefore can't import the new one!")
+        return
+        
+    # remove '/' at the end of the mount path if one happens to be there
     head, tail = os.path.split(mount)
-    #os.rename(mount, mount+backupappend)
-    os.makedirs(mount)
-    mountVolume(volume)
+    if tail == "":
+        mount = head
+    
+    if not subvol0IsMounted():
+        mountSubvol0()
+    
+    os.makedirs(snapPath+"/"+volume)
+    volumeSetMountSetting(volume, mount)
+    createSnapshot(volume, "current")
+    setDefault(volume, "current")
 
-def deleteVolume(volume=""):
+    #mountVolume(volume)
+
+def deleteVolume(volume="", backupappend=".temporary_timetravel_backup"):
     global snapPath
     if len(volume)<1:
         errr("No volume name given, therefore can't delete volume")
@@ -185,6 +238,22 @@ def deleteVolume(volume=""):
     if not volumeExists(volume):
         errr("Volume does not exist, therefore can't delete it")
         return
+      
+    mount = volumeGetMountSetting(volume)
+    st = os.stat(mount)
+    listOfFiles = os.listdir(mount)
+    if len(listOfFiles)>0:
+        if not os.path.isdir(mount+backupappend):
+            os.makedirs(mount+backupappend)
+            os.chown(mount+backupappend, st.st_uid, st.st_gid)
+        for File in listOfFiles:
+            #shutil.move(mount+"/"+File, mount+backupappend+"/"+File)
+            subprocess.check_call(["mv", mount+"/"+File, mount+backupappend+"/"+File])
+            
+        if len(os.listdir(mount))>0:
+            print("Couldn't backup all data from '"+mount+"' to '"+mount+backupappend+"', therefore can't delete the volume. Please backup manually and try to delete the volume again")
+            return
+    
     if volumeIsMounted(volume):
         umountVolume(volume)
     snaplist = listSnaps()[volume]
@@ -192,6 +261,10 @@ def deleteVolume(volume=""):
         head, tail = os.path.split(snap["path"])
         deleteSnapshot(volume, tail)
     subprocess.check_call(['rm', '-r', snapPath+"/"+volume])
+    
+    os.rmdir(mount)
+    if os.path.isdir(mount+backupappend):
+        shutil.move(mount+backupappend, mount)
 
 def volumeIsMounted(volume):
     p = subprocess.Popen(['mount'], stdout=subprocess.PIPE)
