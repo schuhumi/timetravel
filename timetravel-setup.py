@@ -35,16 +35,20 @@ while True:
 
     p = subprocess.Popen(['btrfs', 'subvolume', 'get-default',  '/'], stdout=subprocess.PIPE)
     output, err = p.communicate()
-    line = output.decode("utf-8")
-    index_ID = line.index("ID")
-    index_gen = line.index("gen")
-    index_top_level = line.index("top level")
-    index_path = line.index("path")
-    ID = line[index_ID+2:index_gen].strip()
-    gen = line[index_gen+3:index_top_level].strip()
-    top_level = line[index_top_level+9:index_path].strip()
-    path = line[index_path+4:].strip()
+    
+    #line = output.decode("utf-8")
+    #index_ID = line.index("ID")
+    #index_gen = line.index("gen")
+    #index_top_level = line.index("top level")
+    #index_path = line.index("path")
+    #ID = line[index_ID+2:index_gen].strip()
+    #gen = line[index_gen+3:index_top_level].strip()
+    #top_level = line[index_top_level+9:index_path].strip()
+    #path = line[index_path+4:].strip()
 
+    breadcrumbs = output.decode("utf-8").split()
+    ID = breadcrumbs[breadcrumbs.index("ID")+1]
+    
     if ID != "0": # check for / being a subvolume
         if tt.snapFolderExists(): # check for timetravel having it's folder
             # check whether there's a volume configured for /
